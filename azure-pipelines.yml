@@ -4,30 +4,46 @@
 # https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
 
 trigger:
-- main
+- '*'
 
 pool:
-  name: 'Default'               # Twój self-hosted agent (MARTYNA)
+  name: 'Default' # Replace Default with the name of your agent pool if you used a different pool
+
+variables:
+  buildConfiguration: 'Release'
 
 steps:
-# 1) Zainstaluj .NET 8 SDK na agencie tylko na czas joba
 - task: UseDotNet@2
+  displayName: 'Use .NET SDK 6.x'
   inputs:
-    packageType: 'sdk'
-    version: '8.x'
-    performMultiLevelLookup: true
+    packageType: sdk
+    version: '6.x'
 
-# (opcjonalnie) sprawdź, że jest widoczne
-- script: dotnet --info
-  displayName: 'Check .NET SDK'
+- task: Npm@1
+  displayName: 'Run npm install'
+  inputs:
+    verbose: false
 
-# 2) Restore + Build + Test (dostosuj ścieżkę jeśli masz solution/projekt w podfolderze)
-- script: dotnet restore
-  displayName: 'Restore'
+- script: './node_modules/.bin/node-sass Tailspin.SpaceGame.Web/wwwroot --output Tailspin.SpaceGame.Web/wwwroot'
+  displayName: 'Compile Sass assets'
 
-- script: dotnet build --configuration Release --no-restore
-  displayName: 'Build'
+- task: gulp@1
+  displayName: 'Run gulp tasks'
 
-- script: dotnet test --configuration Release --no-build --verbosity normal
-  displayName: 'Test'
+- script: 'echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt'
+  displayName: 'Write build info'
+  workingDirectory: Tailspin.SpaceGame.Web/wwwroot
+
+- task: DotNetCoreCLI@2
+  displayName: 'Restore project dependencies'
+  inputs:
+    command: 'restore'
+    projects: '**/*.csproj'
+
+- task: DotNetCoreCLI@2
+  displayName: 'Build the project - Release'
+  inputs:
+    command: 'build'
+    arguments: '--no-restore --configuration Release'
+    projects: '**/*.csproj'
 
